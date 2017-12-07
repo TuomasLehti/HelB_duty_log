@@ -153,6 +153,15 @@ public class PDFByteArray {
     /**
      * Returns a string from the array. The end of the string is defined by a certain character,
      * and certain characters are trimmed from the start of the string.
+     *
+     * Encoding ISO-8859-1 is used. This is because the PDF files from HelB are encoded with
+     * WinAnsiEncoding, and ISO-8859-1 happens to encode characters right on this occasion.
+     *
+     * If ISO-8859-1 is unsupported, platform's default charset is used. The so-called scandic
+     * characters will most probably be turned into garbage, but the strings will most likely
+     * remain readable by humans. If strings are handled further by other code, problems may
+     * arise.
+     *
      * @param start The position, from which to get the string.
      * @param trimChars The characters, which are trimmed from the front of the string.
      * @param delimiterChars The characters, which terminate the string.
@@ -161,12 +170,17 @@ public class PDFByteArray {
     public String getString(int start, String trimChars, String delimiterChars) {
         int s = searchNotChar(start, trimChars);
         int end = searchChar(s, delimiterChars);
-        return new String(getBytes(s, end));
+        try {
+            return new String(getBytes(s, end), "ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            return new String(getBytes(s, end));
+        }
     }
 
     /**
      * Returns a string from the current position of the array. The end of the string is defined by
      * a certain character, and certain characters are trimmed from the start of the string.
+     * See documentation for getString(int, String, String) for details about character encoding.
      * @param trimChars The characters, which are trimmed from the front of the string.
      * @param delimiterChars The characters, which terminate the string.
      * @return The string.
@@ -176,7 +190,11 @@ public class PDFByteArray {
         int s = getPosition();
         searchChar(delimiterChars);
         int end = getPosition();
-        return new String(getBytes(s, end));
+        try {
+            return new String(getBytes(s, end), "ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            return new String(getBytes(s, end));
+        }
     }
 
     /**
