@@ -18,9 +18,14 @@ import java.util.Collections;
  *
  * TODO: getPageObjectNumbers should be tested for more compilcated page tree structures.
  * TODO: Multiple items in the page contents array should be supported.
+ */
+/*
+ * author Tuomas Lehti
  *
- * @author Tuomas Lehti
- * @version 0.1
+ * version 0.2 (2017-12-12)
+ * - Escaped parentheses are now replaced with normal parentheses.
+ *
+ * version 0.1
  */
 public class PDFTextExtractor {
 
@@ -29,45 +34,40 @@ public class PDFTextExtractor {
 
     public void openFile(File file) {
         pdf.openFile(file);
-        Log.i("pdftesteri", "Opened file " + file.getName());
-        Log.i("pdftesteri", "Number of objects: " + pdf.numOfObjs());
+//        Log.i("pdftesteri", "Opened file " + file.getName());
+//        Log.i("pdftesteri", "Number of objects: " + pdf.numOfObjs());
     }
 
-    public void getText() {
+    public ArrayList<PDFTextItem> getText() {
         // Locate the root object.
         int rootObjNum = pdf.getTrailerObj().getDictionary().get("Root").getIndirRefObjNum();
-        Log.i("pdftesteri", "Root object number: " + rootObjNum);
+//        Log.i("pdftesteri", "Root object number: " + rootObjNum);
         // Locate the page tree root object.
         int pagesObjNum = pdf.getObj(rootObjNum).getDictionary().get("Pages").getIndirRefObjNum();
-        Log.i("pdftesteri", "Page tree root object number: " + pagesObjNum);
+//        Log.i("pdftesteri", "Page tree root object number: " + pagesObjNum);
         // Get a list of page object numbers.
         ArrayList<Integer> pageList = getPageObjectNumbers(pdf.getObj(pagesObjNum));
-        Log.i("pdftesteri", "Page object numbers: " + pageList.toString());
+//        Log.i("pdftesteri", "Page object numbers: " + pageList.toString());
         // Loop through all pages.
         ArrayList<PDFTextItem> textItemsFromAllPages = new ArrayList<>();
         for (int i=0; i < pageList.size(); i++) {
             // Get the actual page object.
-            Log.i("pdftesteri", "Page: " + i);
+//            Log.i("pdftesteri", "Page: " + i);
             int pageObjNum = pageList.get(i);
-            Log.i("pdftesteri", "at object: " + pageObjNum);
+//            Log.i("pdftesteri", "at object: " + pageObjNum);
             PDFObject pageObj = pdf.getObj(pageObjNum);
             // Get the object in which the contents is. So far all PDF files from HelB have had
             // only one item in the contents array, but this should be futureproofed to handle
             // multiple items.
             int contentsObjNum = pageObj.getDictionary().get("Contents").getArray().get(0).getIndirRefObjNum();
-            Log.i("pdftesteri", "contents at object: " + contentsObjNum);
+//            Log.i("pdftesteri", "contents at object: " + contentsObjNum);
             // Get the decoded contents.
             ArrayList<PDFTextItem> textItemsFromThisPage = getTextItemsFromAPage(contentsObjNum, i);
             textItemsFromAllPages.addAll(textItemsFromThisPage);
 
         }
-
-        Log.i("pdftesteri", "writing... ");
-        writeTextItemsToFile(textItemsFromAllPages, new File(path, "pdf text unsorted.txt"));
         Collections.sort(textItemsFromAllPages);
-        writeTextItemsToFile(textItemsFromAllPages, new File(path, "pdf text sorted.txt"));
-
-        Log.i("pdftesteri", "done... ");
+        return textItemsFromAllPages;
     }
 
     /**
@@ -139,8 +139,11 @@ public class PDFTextExtractor {
             textItem.y = Float.valueOf(posStrSplit[5]) * -1;
             // Read the string and remove parentheses
             String stringStr = decodedContents.getString(PDFByteArray.WHITESPACE, PDFByteArray.ENDOFLINE);
+            stringStr = stringStr.replaceAll("\\(", "(");
+            stringStr = stringStr.replaceAll("\\)", ")");
             textItem.text = stringStr.substring(1, stringStr.length()-4);
             text.add(textItem);
+            // Search for the next occurense of BT-keyword.
             btPos = decodedContents.searchString(decodedContents.getPosition(), "BT");
         }
         return text;
