@@ -1,5 +1,22 @@
 # HelB_duty_log
-Java classes for handling bus drivers' duty log files from Helsingin Bussiliikenne (abbreviated commonly HelB).
+<p>Java classes for handling bus drivers' duty log files from Helsingin Bussiliikenne (abbreviated commonly HelB).</p>
+
+<p>Application stores the duty lists as a three-layer data structure.</p>
+
+<ul>
+  <li>HelBDutyItem stores a single item of a drivers' duty.</li>
+  <li>HelBDuty stores a single duty, in other words the work for a single day.</li>
+  <li>HelBDutyList stores a list of duties.</li>
+</ul>
+ 
+<p>Reader and writer classes handle the input and output between memory and files.</p>
+
+<ul>
+  <li>HelBDutyListReader is an absract class for all readers.</li>
+  <li>HelBDutyListWriter is an absract class for all writers.</li>
+</ul>
+  
+<p>Duty log files are sent to drivers via email as pdf-files. They need to be converted to xml-format. It would be possible to do the conversion with existing software, but that would require extra effort from the user. I haven't found existing Java packages, which would extract the text from a pdf-file, so I have made my own.</p>
 
 <ul>
   <li>PDFByteArray handles PDF files in the lowest possible level, byte level.</li>
