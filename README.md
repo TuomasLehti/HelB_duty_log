@@ -25,3 +25,11 @@
   <li>PDFTextExtractor is a quick and dirty class to extract text from a pdf. It is coded with HelB duty log files in mind, and takes a lot of shortcuts. Maybe some day it will be a clean and well-behaved reader conforming to all standards, but in it's current state it works, so further developement will be on hold.</li>
   <li>PDFTextItem is a small class, which holds a single text object from PDF-files object stream. PDFTextExtractor handles lists of PDFTextItems.
 </ul>
+
+<h2>Changes in march 2019</h2>
+
+<p>In march 2019 HelB changed the format of it's duty log files. Printed out the documents look and feel the same as before, but the program wasn't able to read them properly anymore.</p>
+
+<p>Upon investigating of the document structure it was found out, that every text snippet is surrounded by a bounding or clipping box, which is called surrounding box in this library. The y-coordinates of these boxes were the same on text items, which were meant to be on the same line. The same could not be said for the y-coordinates of the text snippets.</p>
+
+<p>Previously it was still quite easy to work around the text items being in different y-coordinates. The prospect of having to change the workaround every time HelB changes something has motivated me to search for a more stable solution. I hope the solution with the concept of a surrounding box will prove to be stable.</p>
