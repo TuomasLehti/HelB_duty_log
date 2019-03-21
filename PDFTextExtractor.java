@@ -1,31 +1,24 @@
-package tuomaan.pdftest;
+package pdftextextractor;
 
-import android.util.Log;
+//import android.util.Log;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.OutputStream;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
+//import pdf.PDFObjectList;
 
 /**
  * Extracts text from a PDF file. This class is meant to be used with HelB's duty log files, and
  * it contains a lot of shortcuts. This is by no means a conforming reader. Perhaps thing are
  * some day made the right way, but as of now this works for HelB's files and that's enough
  * for now.
+ 
+ * @author Tuomas Lehti
+ * @version 2019-03-21
  *
  * TODO: getPageObjectNumbers should be tested for more compilcated page tree structures.
  * TODO: Multiple items in the page contents array should be supported.
- */
-/*
- * author Tuomas Lehti
- *
- * version 0.2 (2017-12-12)
- * - Escaped parentheses are now replaced with normal parentheses.
- *
- * version 0.1
  */
 public class PDFTextExtractor {
 
@@ -67,6 +60,7 @@ public class PDFTextExtractor {
 
         }
         Collections.sort(textItemsFromAllPages);
+
         return textItemsFromAllPages;
     }
 
@@ -113,6 +107,10 @@ public class PDFTextExtractor {
     /**
      * Decodes a stream object and returns the text snippets from it. This method takes a lot
      * of shortcuts and should be cleaned in the later versions.
+	 * <p>
+	 * The main problem obviously is that the stream should be processed sequentially, and
+	 * there are a lot of useless operators (commands), which do not relate to extracting
+	 * text.
      * @param streamObjNum The number of the stream object. Only single stream object per page is
      *                     supported at this time.
      * @param pageNum The page number of the page to be decoded. This is used in the ordering of the
@@ -120,34 +118,74 @@ public class PDFTextExtractor {
      * @return The text snippets from this page as a list of PDFTextItems.
      */
     private ArrayList<PDFTextItem> getTextItemsFromAPage(int streamObjNum, int pageNum) {
-        // Get the decoded contents of the stream.
+		ArrayList<String> stream = getStream(streamObjNum);
         ArrayList<PDFTextItem> text = new ArrayList<>();
-        PDFObject streamObj = pdf.getObj(streamObjNum);
-        PDFByteArray decodedContents = streamObj.getDecodedStream();
-        // Get the next occurence of BT-keyword, which starts a text portion.
-        decodedContents.setPosition(0);
-        int btPos = decodedContents.searchString(decodedContents.getPosition(), "BT");
-        // Loop until no more BT-keuwords are found.
-        while (btPos > -1) {
-            decodedContents.setPosition(btPos + "BT".length());
-            PDFTextItem textItem = new PDFTextItem();
-            textItem.page = pageNum;
-            // Read the positioning string.
-            String positionStr = decodedContents.getString(PDFByteArray.WHITESPACE, PDFByteArray.ENDOFLINE);
-            String[] posStrSplit = positionStr.split(" ");
-            textItem.x = Float.valueOf(posStrSplit[4]);
-            textItem.y = Float.valueOf(posStrSplit[5]) * -1;
-            // Read the string and remove parentheses
-            String stringStr = decodedContents.getString(PDFByteArray.WHITESPACE, PDFByteArray.ENDOFLINE);
-            stringStr = stringStr.replaceAll("\\(", "(");
-            stringStr = stringStr.replaceAll("\\)", ")");
-            textItem.text = stringStr.substring(1, stringStr.length()-4);
-            text.add(textItem);
-            // Search for the next occurense of BT-keyword.
-            btPos = decodedContents.searchString(decodedContents.getPosition(), "BT");
-        }
+
+		String[] parts = null;
+		for (int row=0; row < stream.size(); row++) {
+			if (stream.get(row).equals("BT")) {
+				PDFTextItem textItem = new PDFTextItem();
+				textItem.page = pageNum;
+
+				// get the dimensions of the preceeding bounding box by backing
+				// up the stream, which should be read sequentially according
+				// to the pdf specification
+				parts = stream.get(row-10).split(" ");
+				textItem.topLeftX = Float.valueOf(parts[0]);
+				textItem.bottomRightY = Float.valueOf(parts[1]) * -1;
+				parts = stream.get(row-8).split(" ");
+				textItem.bottomRightX = Float.valueOf(parts[0]);
+				textItem.topLeftY = Float.valueOf(parts[1]) * -1;
+				
+				// Get the positioning string. In real life this is a matrix,
+				// and it should be handled with the appropriate math, but
+				// this implementation just takes two numbers from a string.
+				// The Y-coordinate is flipped, because in pdf the origin of
+				// the coordinate system is in the lower left corner, and us
+				// humans in the western world at least read from top to bottom.
+				parts = stream.get(row+1).split(" ");
+				textItem.x = Float.valueOf(parts[4]);
+				textItem.y = Float.valueOf(parts[5]) * -1;
+				
+				// Read the string and remove parentheses
+				String stringStr = stream.get(row+2);
+				stringStr = stringStr.replace("\\(", "(");
+				stringStr = stringStr.replace("\\)", ")");
+				textItem.text = stringStr.substring(1, stringStr.length()-4);
+				text.add(textItem);
+			}
+		}
         return text;
     }
+
+	/**
+	 * Returns a stream as an array of strings.
+	 * <p>
+	 * Every PDF file produced by HelB so far has had each operator on its own
+	 * line. 
+	 * @param streamObjNum 	The number of the stream object.
+	 * @return 				The array of strings.
+	 */
+	private ArrayList<String> getStream(int streamObjNum) {
+        // Get the decoded contents of the stream.
+        PDFObject streamObj = pdf.getObj(streamObjNum);
+        PDFByteArray decodedContents = streamObj.getDecodedStream();
+        // Split the byte array into strings.
+		ArrayList<String> strs = new ArrayList<String>();
+		while (decodedContents.getPosition() < decodedContents.getLength()) {
+			strs.add(decodedContents.getString(PDFByteArray.WHITESPACE, PDFByteArray.ENDOFLINE));
+		}
+		return strs;
+	}
+
+	/**
+	 * Writes the text items to a csv-file. If a file already exists, it will
+	 * be overwritten.
+	 * @param file 		The file.
+	 */
+	public void writeTextItemsToFile(File file) {
+		writeTextItemsToFile(getText(), file);
+	}
 
     private void writeTextItemsToFile(ArrayList<PDFTextItem> items, File file) {
         try {
@@ -158,9 +196,25 @@ public class PDFTextExtractor {
             }
             fw.close();
         } catch (Exception e) {
-            Log.i("pdftesteri", "Output error.");
+//            Log.i("pdftesteri", "Output error.");
         }
 
     }
 
 }
+
+/*
+ * CHANGELOG
+ *
+ * version 2019-03-21
+ * - getTextItemFromAPage now reads the bounding box of a text. This was
+ *   motivated by HelB changing the format of it's duty log files. When
+ *   investigation the new format it was found out, that the y-coordinates of
+ *   the bounding boxes were the same on each text line, and the y-coordinates 
+ *   of the text were all over the place.
+ *
+ * version 0.2 (2017-12-12)
+ * - Escaped parentheses are now replaced with normal parentheses.
+ *
+ * version 0.1
+ */
